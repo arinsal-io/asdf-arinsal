@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${ASDF_INSTALL_PATH:?asdf did not set ASDF_INSTALL_PATH}"
+: "${ASDF_DOWNLOAD_PATH:?asdf did not set ASDF_DOWNLOAD_PATH}"
+for executable in arinsal erl erlc escript; do
+	if [ ! -x "$ASDF_DOWNLOAD_PATH/bin/$executable" ]; then
+		echo "arinsal: verified distribution is missing bin/$executable" >&2
+		exit 1
+	fi
+done
+for helper in erl_child_setup inet_gethost; do
+	if [ ! -x "$ASDF_DOWNLOAD_PATH/lib/arinsal/otp/erts-17.1/bin/$helper" ]; then
+		echo "arinsal: verified distribution is missing OTP helper $helper" >&2
+		exit 1
+	fi
+done
+mkdir -p "$ASDF_INSTALL_PATH"
+cp -R "$ASDF_DOWNLOAD_PATH/." "$ASDF_INSTALL_PATH/"

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+plugin_dir=$(CDPATH='' cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# shellcheck source=lib/utils.bash
+source "$plugin_dir/lib/utils.bash"
+
+pages=$(mktemp -d "${TMPDIR:-/tmp}/asdf-arinsal-releases.XXXXXX")
+trap 'rm -rf "$pages"' EXIT HUP INT TERM
+page=1
+while :; do
+	response="$pages/page-$page.json"
+	url="https://api.github.com/repos/arinsal-io/arinsal/releases?per_page=100&page=$page"
+	status=$(arinsal::github_api_get "$url" "$response")
+	if [ "$status" = 404 ] && [ -z "$(arinsal::api_token)" ]; then
+		echo 'arinsal: no public releases found; set GITHUB_API_TOKEN or GITHUB_TOKEN for private releases' >&2
+		printf '[]\n' >"$response"
+		break
+	fi
+	if [ "$status" != 200 ]; then
+		echo "arinsal: GitHub releases API returned HTTP $status" >&2
+		exit 1
+	fi
+	count=$(python3 -c 'import json, sys; print(len(json.load(open(sys.argv[1], encoding="utf-8"))))' "$response")
+	if [ "$count" -lt 100 ]; then
+		break
+	fi
+	page=$((page + 1))
+done
+
+python3 - "$pages" <<'PY'
+import json
+import pathlib
+import re
+import sys
+
+versions = set()
+for page in pathlib.Path(sys.argv[1]).glob("page-*.json"):
+    for release in json.loads(page.read_text(encoding="utf-8")):
+        if release.get("draft") or release.get("prerelease"):
+            continue
+        match = re.fullmatch(r"v?(0\.\d+\.\d+)", release.get("tag_name", ""))
+        if match:
+            versions.add(match.group(1))
+
+for version in sorted(versions, key=lambda value: tuple(int(part) for part in value.split("."))):
+    print(version)
+PY

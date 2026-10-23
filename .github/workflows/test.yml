@@ -1,0 +1,29 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plugin-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-14, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - name: Test plugin installation
+        uses: asdf-vm/actions/plugin-test@b7bcd026f18772e44fe1026d729e1611cc435d47 # v4
+        with:
+          command: "arinsal --version && erl -noshell -eval 'halt().'"
+          github_token: ${{ secrets.ARINSAL_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.ARINSAL_TOKEN }}
